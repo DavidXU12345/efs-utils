@@ -173,6 +173,12 @@ jobs:
             image: amazonlinux:2
             old_glibc: true
     steps:
+      # AL2023 (amazonlinux:latest) ships without tar, which the runner needs to
+      # unpack JS actions; install it before the checkout action runs.
+      - name: Prepare tar for actions (modern)
+        if: ${{ !matrix.old_glibc }}
+        run: |
+          yum -y install tar gzip
       # old_glibc: no JS actions (Node 24 needs glibc >= 2.28); checkout by hand.
       - name: Manual checkout (old glibc)
         if: ${{ matrix.old_glibc }}
