@@ -7,6 +7,14 @@
 # Jobs run inside the per-matrix container image (the same images the previous
 # CI system used), so the apt/yum/zypper toolchain setup below runs against the
 # target distribution exactly as it would on that distribution.
+#
+# NOTE on `old_glibc` legs (glibc < 2.28): GitHub's runner now executes all
+# JavaScript actions on Node 24, which requires glibc >= 2.28. Distros older
+# than that (ubuntu 18.04, amazonlinux:2, opensuse leap 15.1/15.2) therefore
+# cannot run actions/checkout or actions/setup-go at all. Those legs perform a
+# manual `git` checkout and a manual Go install with plain shell steps (no JS
+# actions). SUSE images additionally ship without `tar`, which the runner needs
+# to unpack JS actions, so the modern SUSE legs install it before checkout.
 name: CI
 
 on: [push, pull_request]
@@ -39,11 +47,11 @@ jobs:
           pip install --upgrade pip
           pip install virtualenv
           virtualenv -p $(which python) ~/efs-utils-virtualenv
-          source ~/efs-utils-virtualenv/bin/activate
+          . ~/efs-utils-virtualenv/bin/activate
           pip install -r requirements.txt
       - name: Run all tests
         run: |
-          source ~/efs-utils-virtualenv/bin/activate
+          . ~/efs-utils-virtualenv/bin/activate
           make test
       - name: Store artifacts
         uses: actions/upload-artifact@v4
@@ -83,6 +91,16 @@ jobs:
       - name: Install curl
         run: |
           apt-get -y install curl
+      # old_glibc: no JS actions (Node 24 needs glibc >= 2.28); checkout by hand.
+      - name: Manual checkout (old glibc)
+        if: ${{ matrix.old_glibc }}
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates tar
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
       - name: Install latest Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -93,12 +111,12 @@ jobs:
         with:
           go-version: 'stable'
           cache: false
-      - name: Install golang (node16)
+      - name: Install golang (manual, old glibc)
         if: ${{ matrix.old_glibc }}
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
-        with:
-          go-version: 'stable'
-          cache: false
+        run: |
+          GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
+          curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
+          rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tgz
       - name: Install dependencies
         run: |
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
@@ -117,9 +135,6 @@ jobs:
       - name: Checkout
         if: ${{ !matrix.old_glibc }}
         uses: actions/checkout@v4
-      - name: Checkout (node16)
-        if: ${{ matrix.old_glibc }}
-        uses: actions/checkout@v3
       - name: Build DEB
         run: |
           . "$HOME/.cargo/env"
@@ -158,12 +173,19 @@ jobs:
             image: amazonlinux:2
             old_glibc: true
     steps:
+      # old_glibc: no JS actions (Node 24 needs glibc >= 2.28); checkout by hand.
+      - name: Manual checkout (old glibc)
+        if: ${{ matrix.old_glibc }}
+        run: |
+          yum -y install git tar
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
       - name: Checkout
         if: ${{ !matrix.old_glibc }}
         uses: actions/checkout@v4
-      - name: Checkout (node16)
-        if: ${{ matrix.old_glibc }}
-        uses: actions/checkout@v3
       - name: Install latest Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -173,12 +195,12 @@ jobs:
         with:
           go-version: 'stable'
           cache: false
-      - name: Install golang (node16)
+      - name: Install golang (manual, old glibc)
         if: ${{ matrix.old_glibc }}
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
-        with:
-          go-version: 'stable'
-          cache: false
+        run: |
+          GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
+          curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
+          rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tgz
       - name: Install dependencies
         run: |
           if grep -q '^ID="amzn"' /etc/os-release && grep -q '^VERSION_ID="2"' /etc/os-release 2>/dev/null; then
@@ -231,12 +253,26 @@ jobs:
           - name: opensuse-tumbleweed
             image: opensuse/tumbleweed
     steps:
+      # SUSE images ship without tar, which the runner needs to unpack JS
+      # actions; install it before the checkout action runs (modern legs only).
+      - name: Prepare zypper + tar for actions (modern)
+        if: ${{ !matrix.old_glibc }}
+        run: |
+          zypper --non-interactive --gpg-auto-import-keys refresh || true
+          zypper --non-interactive install -y tar gzip
       - name: Checkout
         if: ${{ !matrix.old_glibc }}
         uses: actions/checkout@v4
-      - name: Checkout (node16)
+      # old_glibc: no JS actions (Node 24 needs glibc >= 2.28); checkout by hand.
+      - name: Manual checkout (old glibc)
         if: ${{ matrix.old_glibc }}
-        uses: actions/checkout@v3
+        run: |
+          zypper --non-interactive install -y git tar curl gzip
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
       - name: Refresh source
         run: |
           zypper refresh
@@ -252,12 +288,12 @@ jobs:
         with:
           go-version: 'stable'
           cache: false
-      - name: Install golang (node16)
+      - name: Install golang (manual, old glibc)
         if: ${{ matrix.old_glibc }}
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
-        with:
-          go-version: 'stable'
-          cache: false
+        run: |
+          GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
+          curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
+          rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tgz
       - name: Install dependencies
         run: |
           zypper install -y --force-resolution rpm-build
