@@ -99,7 +99,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init -q .
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git fetch --no-tags --depth 1 origin "$GITHUB_SHA"
           git checkout -q FETCH_HEAD
       - name: Install latest Rust
         run: |
@@ -187,7 +187,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init -q .
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git fetch --no-tags --depth 1 origin "$GITHUB_SHA"
           git checkout -q FETCH_HEAD
       - name: Checkout
         if: ${{ !matrix.old_glibc }}
@@ -277,7 +277,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init -q .
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          git -c protocol.version=2 fetch --no-tags --depth 1 origin "$GITHUB_SHA"
+          git fetch --no-tags --depth 1 origin "$GITHUB_SHA"
           git checkout -q FETCH_HEAD
       - name: Refresh source
         run: |
