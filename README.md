@@ -85,6 +85,13 @@ You can use AWS Systems Manager Distributor to automatically install or update `
 
 Building from source requires Rust 1.91.1+, Cargo, Go 1.17.13+, CMake 3.0+, GCC/G++, and Perl. See [INSTALL.md](INSTALL.md) for detailed build instructions for your distribution.
 
+> **Note for openSUSE Leap 16:** The bundled AWS-LC FIPS module fails to build with Leap 16's default GCC (14/15) — its assembler output trips the FIPS "delocate" step (`.data section found in module`). Install GCC 13 and point the build at it before building:
+> ```bash
+> sudo zypper install -y gcc13 gcc13-c++
+> export CC=gcc-13 CXX=g++-13
+> ```
+> Then build as usual. Earlier openSUSE Leap releases (15.x) and Tumbleweed are unaffected (Tumbleweed already builds with GCC 13).
+
 ### For macOS Tahoe, Sequoia, Sonoma, and Ventura distributions
 
 For EC2 Mac instances running macOS Tahoe, Sonoma, or Ventura, you can install amazon-efs-utils from the [homebrew-aws](https://github.com/aws/homebrew-aws) repository. This is supported on only EC2 instances, not for local Mac computers. macOS is unsupported for S3 file systems.
