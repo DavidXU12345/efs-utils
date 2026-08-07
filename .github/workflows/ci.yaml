@@ -288,14 +288,11 @@ jobs:
       - name: Install latest Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-      - name: Install golang
-        if: ${{ !matrix.old_glibc }}
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-        with:
-          go-version: 'stable'
-          cache: false
-      - name: Install golang (manual, old glibc)
-        if: ${{ matrix.old_glibc }}
+      # All SUSE legs install Go by hand: actions/setup-go corrupts the container
+      # exec PATH on the newer/rolling openSUSE images (leap 15.3/15.4/latest,
+      # tumbleweed), breaking the next step with `exec: "sh": not found`. The
+      # manual tarball install is what the leap15.1/15.2 legs already use.
+      - name: Install golang (manual)
         run: |
           GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
           curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
