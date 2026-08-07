@@ -105,14 +105,9 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           . "$HOME/.cargo/env"
-      - name: Install golang
-        if: ${{ !matrix.old_glibc }}
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-        with:
-          go-version: 'stable'
-          cache: false
-      - name: Install golang (manual, old glibc)
-        if: ${{ matrix.old_glibc }}
+      # Install Go by hand on every leg to mirror the CircleCI wget|tar approach
+      # (and because actions/setup-go can corrupt the container exec PATH).
+      - name: Install golang (manual)
         run: |
           GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
           curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
@@ -195,14 +190,9 @@ jobs:
       - name: Install latest Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-      - name: Install golang
-        if: ${{ !matrix.old_glibc }}
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
-        with:
-          go-version: 'stable'
-          cache: false
-      - name: Install golang (manual, old glibc)
-        if: ${{ matrix.old_glibc }}
+      # Install Go by hand on every leg to mirror the CircleCI wget|tar approach
+      # (and because actions/setup-go can corrupt the container exec PATH).
+      - name: Install golang (manual)
         run: |
           GO_TGZ="$(curl -sSL https://go.dev/VERSION?m=text | head -n1).linux-amd64.tar.gz"
           curl -sSL "https://go.dev/dl/${GO_TGZ}" -o /tmp/go.tgz
